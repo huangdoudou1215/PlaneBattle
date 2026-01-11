@@ -33,6 +33,8 @@ public class GameMgr
         Score = 0;
         // 初始化核弹
         BombCnt = 0;
+        // 初始化生命数（两条命）
+        LifeCnt = 2;
 
 
         // 关闭开始游戏界面
@@ -201,10 +203,24 @@ public class GameMgr
         }
     }
 
+    /// <summary>
+    /// 玩家生命数
+    /// </summary>
+    public int LifeCnt
+    {
+        get { return m_lifeCnt; }
+        set
+        {
+            m_lifeCnt = value;
+            EventDispatcher.instance.DispatchEvent(EventDef.EVENT_UPDATE_LIFE_CNT);
+        }
+    }
+
     private LevelConfig m_level;
     private LevelConfig m_nextLevel;
     private int m_score;
     private int m_bombCnt;
+    private int m_lifeCnt;
 
     // 单例模式
     private static GameMgr s_instance;

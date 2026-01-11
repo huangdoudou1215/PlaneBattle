@@ -17,6 +17,9 @@ public class PlayerAircraft : BaseAircraft
     // 子弹生成器
     private PlayerBulletGenerator m_bulletGenerator = new PlayerBulletGenerator();
 
+    // 是否正在爆炸动画中
+    private bool m_isExploding = false;
+
     protected override void Awake()
     {
         base.Awake();
@@ -24,11 +27,23 @@ public class PlayerAircraft : BaseAircraft
         m_aniEvent.aniEventCb = (msg) =>
         {
             // 爆炸动画播放结束
-            if ("explode_finish" == msg)
+            if ("explode_finish" == msg && m_isExploding)
             {
-                DestroySelf();
-                // 游戏结束
-                GameMgr.instance.GameOver();
+                // 减少生命值
+                --GameMgr.instance.LifeCnt;
+
+                // 检查是否还有生命
+                if (GameMgr.instance.LifeCnt > 0)
+                {
+                    // 还有生命，复活玩家
+                    Revive();
+                }
+                else
+                {
+                    // 没有生命了，游戏结束
+                    DestroySelf();
+                    GameMgr.instance.GameOver();
+                }
             }
         };
 
@@ -118,7 +133,41 @@ public class PlayerAircraft : BaseAircraft
     /// </summary>
     public override void Explode()
     {
+        // 如果已经在爆炸中，不要重复触发
+        if (m_isExploding) return;
+
+        m_isExploding = true;
+        m_collider.enabled = false;
         ani.SetBool("explode", true);
+    }
+
+    /// <summary>
+    /// 复活玩家
+    /// </summary>
+    private void Revive()
+    {
+        // 重置动画状态
+        ani.SetBool("explode", false);
+        ani.Rebind();
+
+        // 清空子弹
+        m_bulletGenerator.ClearBullets();
+
+        // 先将玩家飞机移回屏幕底部中央
+        Vector3 revivePos = Camera.main.ScreenToWorldPoint(new Vector3(Screen.width / 2, 100, 5));
+        m_selfTrans.position = revivePos;
+
+        // 强制同步物理系统，确保碰撞体位置更新
+        Physics2D.SyncTransforms();
+
+        // 移动到安全位置后再启用碰撞体
+        if (m_collider != null)
+        {
+            m_collider.enabled = true;
+        }
+
+        // 复活完成后才重置爆炸标志
+        m_isExploding = false;
     }
 
     public override void DestroySelf()

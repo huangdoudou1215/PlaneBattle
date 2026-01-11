@@ -76,6 +76,11 @@ public class EnemyAircraft : BaseAircraft
                 Explode();
             }
         }
+        else if ("Player" == other.tag)
+        {
+            // 与玩家碰撞，直接爆炸
+            Explode();
+        }
     }
 
     private void LateUpdate()

@@ -18,4 +18,9 @@ public class EventDef
     /// 更新核弹数量
     /// </summary>
     public const string EVENT_UPDATE_BOMB_CNT = "EVENT_UPDATE_BOMB_CNT";
+
+    /// <summary>
+    /// 更新玩家生命数
+    /// </summary>
+    public const string EVENT_UPDATE_LIFE_CNT = "EVENT_UPDATE_LIFE_CNT";
 }
