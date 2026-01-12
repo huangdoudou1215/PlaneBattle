@@ -48,19 +48,34 @@ public class EnemyBulletGenerator
     }
 
     /// <summary>
-    /// 创建敌机3的子弹
+    /// 创建敌机3的子弹（修改版：5个子弹，合理角度分布）
     /// </summary>
     /// <param name="aircraftPos"></param>
     private static void GenerateEnemy3Bullet(Vector3 aircraftPos)
     {
-        for (int i = 0; i < 8; ++i)
+        // 子弹数量减少到5个
+        int bulletCount = 5;
+        
+        for (int i = 0; i < bulletCount; ++i)
         {
             var bullet = CreateBulletObj(aircraftPos);
-            bullet.transform.Rotate(0, 0, 180 - 90f / 2 + 90f / 7 * i);
+            
+            // 方法1：对称分布（推荐）
+            // 总覆盖角度：90度，中心向前（180度），左右各60度
+            float totalAngle = 90f; // 覆盖角度
+            float startAngle = 180f - totalAngle / 2; // 起始角度
+            float angleStep = totalAngle / (bulletCount - 1); // 每个子弹的角度间隔
+            
+            float currentAngle = startAngle + angleStep * i;
+            
+            // 方法2：固定角度（可选）
+            // float[] fixedAngles = {150f, 165f, 180f, 195f, 210f}; // 5个固定角度
+            // float currentAngle = fixedAngles[i];
+            
+            bullet.transform.Rotate(0, 0, currentAngle);
             bullet.SetTargetDir(bullet.transform.up);
             bullet.rotateSelf = false;
         }
-
     }
 
     /// <summary>

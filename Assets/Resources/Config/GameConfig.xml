@@ -8,14 +8,14 @@
         <Enemy Index="3" MaxSpeed="0.9" MinSpeed="0.8" Blood="5" Weight="0" />
       </Enemies>
     </Level>
-    <Level EnemySpawnTime="0.3" ID="2" Score="10000">
+    <Level EnemySpawnTime="0.3" ID="2" Score="50000">
       <Enemies>
         <Enemy Index="1" MaxSpeed="1.65" MinSpeed="1.35" Blood="2" Weight="70" />
         <Enemy Index="2" MaxSpeed="2.1" MinSpeed="1.4" Blood="6" Weight="20" />
         <Enemy Index="3" MaxSpeed="1.2" MinSpeed="1.1" Blood="10" Weight="10" />
       </Enemies>
     </Level>
-    <Level EnemySpawnTime="0.2" ID="3" Score="50000">
+    <Level EnemySpawnTime="0.1" ID="3" Score="200000">
       <Enemies>
         <Enemy Index="1" MaxSpeed="1.8" MinSpeed="1.5" Blood="3" Weight="60" />
         <Enemy Index="2" MaxSpeed="2.4" MinSpeed="1.55" Blood="12" Weight="20" />
