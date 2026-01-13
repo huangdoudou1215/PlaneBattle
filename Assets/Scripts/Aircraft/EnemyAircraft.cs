@@ -7,6 +7,7 @@ using System;
 public class EnemyAircraft : BaseAircraft
 {
     public float moveSpeed = 0;
+    public float moveSpeedX = 0;
     public Action backToPoolAction;
     private bool m_underAttack = false;
     private float m_timeToFire = -1;

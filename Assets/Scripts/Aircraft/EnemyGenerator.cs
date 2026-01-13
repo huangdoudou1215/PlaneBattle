@@ -60,7 +60,7 @@ public class EnemyGenerator
         }
 
         /*---------- 更新Boss移动 ----------*/
-        if (m_inBossMode && m_bossSpawned)
+        if (m_inBossMode && m_bossSpawned &&m_boss != null)
         {
             UpdateBossMovement();
         }
@@ -311,11 +311,17 @@ public class EnemyGenerator
             5));
         m_boss.transform.position = startPos;
         
-        // 目标位置
-        m_bossTargetY = 0;
+        // 计算目标位置：屏幕顶部往下四分之一的位置
+        float screenHeight = Camera.main.orthographicSize * 2;
+        float topY = Camera.main.transform.position.y + Camera.main.orthographicSize;
+        m_bossTargetY = topY - (screenHeight / 4);
         
         m_bossSpawned = true;
         m_isBossMoving = true;
+        
+        // 初始化左右移动状态
+        m_bossMoveDirection = 1f; // 1表示向右，-1表示向左
+        m_isBossPatrolling = false; // 初始时还未开始巡逻
         
         Debug.Log($"Boss已生成！起始位置: {startPos}, 目标高度: {m_bossTargetY}");
     }
@@ -325,23 +331,98 @@ public class EnemyGenerator
     /// </summary>
     private void UpdateBossMovement()
     {
-        if (m_boss == null || !m_isBossMoving) return;
+        if (m_boss == null) return;
         
         Vector3 currentPos = m_boss.transform.position;
         
-        // 如果Boss还没到达目标位置
-        if (currentPos.y > m_bossTargetY)
+        // 第一阶段：垂直移动到目标位置
+        if (m_isBossMoving)
         {
-            // 缓慢下落到目标位置
-            currentPos.y -= m_boss.moveSpeed * Time.deltaTime;
+            float distanceToTarget = currentPos.y - m_bossTargetY;
             
-            // 如果到达或超过目标位置
-            if (currentPos.y <= m_bossTargetY)
+            // 检查是否已经到达目标位置
+            if (Mathf.Abs(distanceToTarget) < 0.01f)
             {
                 currentPos.y = m_bossTargetY;
                 m_isBossMoving = false;
-                m_boss.moveSpeed = 0f; // 静止不动
-                Debug.Log("Boss已到达目标位置！");
+                m_boss.moveSpeed = 0f; // 这里应该设置为0，表示垂直速度为0
+                m_isBossPatrolling = true; // 开始巡逻
+                m_boss.transform.position = currentPos;
+                Debug.Log("Boss已到达目标位置，开始左右巡逻！");
+                return;
+            }
+            
+            // 如果还在目标位置上方，继续移动
+            if (distanceToTarget > 0)
+            {
+                float moveAmount = m_boss.moveSpeed * Time.deltaTime;
+                
+                // 防止过度移动（越过目标）
+                if (moveAmount >= distanceToTarget)
+                {
+                    currentPos.y = m_bossTargetY;
+                    m_isBossMoving = false;
+                    m_boss.moveSpeed = BOSS_PATROL_SPEED; // 设置巡逻速度
+                    m_isBossPatrolling = true; // 开始巡逻
+                }
+                else
+                {
+                    currentPos.y -= moveAmount;
+                }
+                
+                m_boss.transform.position = currentPos;
+            }
+            else
+            {
+                // 如果已经超过目标位置（理论上不应该发生），强制修正
+                Debug.LogWarning("Boss位置异常，强制修正！");
+                currentPos.y = m_bossTargetY;
+                m_isBossMoving = false;
+                m_boss.moveSpeed = BOSS_PATROL_SPEED; // 设置巡逻速度
+                m_isBossPatrolling = true; // 开始巡逻
+                m_boss.transform.position = currentPos;
+            }
+        }
+        // 第二阶段：左右巡逻移动
+        else if (m_isBossPatrolling)
+        {
+            // 如果移动速度为0，设置巡逻速度
+            if (m_boss.moveSpeed == 0f)
+            {
+                m_boss.moveSpeedX = BOSS_PATROL_SPEED;
+            }
+
+            
+            // 计算水平移动
+            float moveAmount = m_boss.moveSpeedX * m_bossMoveDirection * Time.deltaTime;
+            currentPos.x += moveAmount;
+            
+            // 检查屏幕边界
+            float screenHalfWidth = GetScreenHalfWidth();
+            float screenWidth = screenHalfWidth * 2;
+            
+            // 转换为屏幕坐标检查边界
+            Vector3 screenPos = Camera.main.WorldToScreenPoint(currentPos);
+            
+            // 获取Boss碰撞体半径（如果没有碰撞体，使用一个估计值）
+            float bossRadius = BOSS_RADIUS;
+            
+            // 计算世界坐标下的边界
+            float leftBoundary = -screenHalfWidth + bossRadius;
+            float rightBoundary = screenHalfWidth - bossRadius;
+            
+            // 检查是否到达屏幕边缘
+            if (currentPos.x <= leftBoundary)
+            {
+                currentPos.x = leftBoundary;
+                m_bossMoveDirection = 1f; // 向右转
+                Debug.Log("Boss到达左边界，开始向右移动");
+            }
+            else if (currentPos.x >= rightBoundary)
+            {
+                currentPos.x = rightBoundary;
+                m_bossMoveDirection = -1f; // 向左转
+                Debug.Log("Boss到达右边界，开始向左移动");
             }
             
             m_boss.transform.position = currentPos;
@@ -382,14 +463,18 @@ public class EnemyGenerator
     private float m_bossTimer = 0;
     private EnemyAircraft m_boss = null;
     private bool m_isBossMoving = false;
+    private bool m_isBossPatrolling = false; // 新增：是否正在巡逻
     private float m_bossTargetY = 0;
+    private float m_bossMoveDirection = 1f; // 新增：Boss移动方向（1右，-1左）
 
     private const float BOSS_ENTER_CHANCE = 1.00f;      // 每秒进入Boss模式概率
     private const float BOSS_DURATION = 30f;            // Boss模式持续时间
     private const float BOSS_SPAWN_DELAY = 1f;          // 进入Boss模式后延迟生成Boss
     private const int BOSS_HEALTH = 30;                 // Boss血量
     private const float BOSS_MOVE_SPEED = 1f;           // Boss下落速度
+    private const float BOSS_PATROL_SPEED = 2f;         // 新增：Boss左右巡逻速度
     private const float BOSS_MARGIN = 2f;               // Boss距离屏幕边缘的留空
+    private const float BOSS_RADIUS = 1.5f;             // 新增：Boss碰撞体半径（用于边界检测）
     #endregion
 
     #region 公共方法
@@ -453,6 +538,14 @@ public class EnemyGenerator
                 new Vector3(-GetScreenHalfWidth(), m_bossTargetY, 0),
                 new Vector3(GetScreenHalfWidth(), m_bossTargetY, 0)
             );
+            
+            // 绘制Boss移动方向
+            if (m_isBossPatrolling)
+            {
+                Gizmos.color = m_bossMoveDirection > 0 ? Color.green : Color.yellow;
+                Gizmos.DrawRay(m_boss.transform.position, 
+                              new Vector3(m_bossMoveDirection * 2, 0, 0));
+            }
         }
     }
     #endregion
