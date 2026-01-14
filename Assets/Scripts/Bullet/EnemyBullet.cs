@@ -16,6 +16,14 @@ public class EnemyBullet : MonoBehaviour
     /// </summary>
     public Action backToPoolAction;
 
+    // 新增：曲线移动参数
+    public bool useCurveMove = false;
+    public float curveAmplitude = 0.5f;
+    public float curveFrequency = 2f;
+    private float curveTimer = 0f;
+
+    private Vector3 originalDirection;
+
     private Transform m_selfTrans;
     private GameObject m_selfGo;
     private Vector3 m_targetDir;
@@ -48,6 +56,16 @@ public class EnemyBullet : MonoBehaviour
         {
             BackToPool();
         }
+    }
+
+    // 新增：设置曲线移动
+    public void SetCurveMove(bool enable, float amplitude = 0.5f, float frequency = 2f)
+    {
+        useCurveMove = enable;
+        curveAmplitude = amplitude;
+        curveFrequency = frequency;
+        curveTimer = 0f;
+        originalDirection = m_targetDir;
     }
 
     private void Update()

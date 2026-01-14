@@ -121,6 +121,63 @@ public class EnemyBulletGenerator
         s_reusePool.Clear();
     }
 
+        /// <summary>
+    /// 生成Boss子弹（新增方法）
+    /// </summary>
+    public static void GenerateBossBullet(Vector3 bossPos, float angle, EnemyGenerator.BossPhase phase)
+    {
+        if (null == s_enemyBulletRoot)
+        {
+            var rootObj = new GameObject("EnemyBulletRoot");
+            s_enemyBulletRoot = rootObj.transform;
+        }
+        
+        var bullet = CreateBulletObj(bossPos);
+        
+        // 根据阶段设置不同的子弹属性
+        switch (phase)
+        {
+            case EnemyGenerator.BossPhase.Phase1_Patrol:
+                // 第一阶段：较慢的子弹
+                bullet.speed = 3f;
+                bullet.transform.Rotate(0, 0, angle);
+                bullet.SetTargetDir(bullet.transform.up);
+                bullet.rotateSelf = false;
+                // 设置颜色为红色
+                SetBulletColor(bullet, Color.red);
+                break;
+                
+            case EnemyGenerator.BossPhase.Phase2_Attack:
+                // 第二阶段：更快的子弹，可能带有旋转
+                bullet.speed = 5f;
+                bullet.transform.Rotate(0, 0, angle);
+                bullet.SetTargetDir(bullet.transform.up);
+                
+                // 50%的子弹会旋转
+                // if (Random.value > 0.5f)
+                // {
+                //     bullet.rotateSelf = true;
+                // }
+                
+                // 设置颜色为紫色
+                SetBulletColor(bullet, new Color(0.8f, 0.2f, 0.8f));
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 设置子弹颜色（新增辅助方法）
+    /// </summary>
+    private static void SetBulletColor(EnemyBullet bullet, Color color)
+    {
+        SpriteRenderer renderer = bullet.GetComponent<SpriteRenderer>();
+        if (renderer != null)
+        {
+            renderer.color = color;
+        }
+    }
+
+
     private static Transform s_enemyBulletRoot;
     private static Queue<EnemyBullet> s_reusePool = new Queue<EnemyBullet>();
 }

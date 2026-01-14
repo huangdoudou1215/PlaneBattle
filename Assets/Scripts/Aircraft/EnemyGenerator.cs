@@ -243,6 +243,24 @@ public class EnemyGenerator
     #endregion
 
     #region Boss模式专属
+
+
+    // 添加阶段枚举
+    public enum BossPhase
+    {
+        Phase1_Patrol,     // 第一阶段：巡逻移动
+        Phase2_Attack,     // 第二阶段：发射弹幕
+        Phase3_Final       // 第三阶段：狂暴模式（可选）
+    }
+
+    private BossPhase m_currentBossPhase = BossPhase.Phase1_Patrol;
+    private float m_phase2HealthThreshold = 15f; // 当血量低于15时进入第二阶段
+    private float m_bossFireTimer = 0f;
+    private const float BOSS_FIRE_INTERVAL_PHASE1 = 1f; // 第一阶段射击间隔
+    private const float BOSS_FIRE_INTERVAL_PHASE2 = 0.25f; // 第二阶段射击间隔
+    private float m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE1;
+
+
     /// <summary>
     /// 进入Boss模式
     /// </summary>
@@ -253,6 +271,9 @@ public class EnemyGenerator
         m_bossTimer = 0;
         m_bossSpawned = false;
         m_boss = null;
+        m_currentBossPhase = BossPhase.Phase1_Patrol;
+        m_bossFireTimer = 0f;
+        m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE1;
         
         Debug.Log("进入Boss模式！");
         
@@ -332,6 +353,9 @@ public class EnemyGenerator
     private void UpdateBossMovement()
     {
         if (m_boss == null) return;
+
+        // 检查阶段转换
+        CheckBossPhase();
         
         Vector3 currentPos = m_boss.transform.position;
         
@@ -427,7 +451,164 @@ public class EnemyGenerator
             
             m_boss.transform.position = currentPos;
         }
+
+        // 更新Boss射击
+        UpdateBossShooting();
     }
+
+    /// <summary>
+    /// 检查并更新Boss阶段
+    /// </summary>
+    private void CheckBossPhase()
+    {
+        if (m_boss == null) return;
+        
+        // 第一阶段：血量高于阈值
+        if (m_boss.blood > m_phase2HealthThreshold && m_currentBossPhase != BossPhase.Phase1_Patrol)
+        {
+            m_currentBossPhase = BossPhase.Phase1_Patrol;
+            m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE1;
+            Debug.Log("Boss进入第一阶段：巡逻模式");
+            
+            // 可以改变颜色
+            SpriteRenderer renderer = m_boss.GetComponent<SpriteRenderer>();
+            if (renderer != null)
+            {
+                renderer.color = Color.red;
+            }
+        }
+        // 第二阶段：血量低于阈值
+        else if (m_boss.blood <= m_phase2HealthThreshold && m_boss.blood > 0 && m_currentBossPhase != BossPhase.Phase2_Attack)
+        {
+            m_currentBossPhase = BossPhase.Phase2_Attack;
+            m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE2;
+            Debug.Log("Boss进入第二阶段：弹幕攻击模式！");
+            
+            // 改变颜色为紫色表示狂暴
+            SpriteRenderer renderer = m_boss.GetComponent<SpriteRenderer>();
+            if (renderer != null)
+            {
+                renderer.color = new Color(0.8f, 0.2f, 0.8f); // 紫色
+            }
+            
+            // 增加移动速度
+            m_boss.moveSpeedX = BOSS_PATROL_SPEED * 3.0f;
+        }
+    }
+
+    /// <summary>
+    /// 更新Boss射击
+    /// </summary>
+    private void UpdateBossShooting()
+    {
+        if (m_boss == null || !m_bossSpawned) return;
+        
+        // 只有到达巡逻位置后才开始射击
+        if (!m_isBossPatrolling || m_isBossMoving) return;
+        
+        m_bossFireTimer += Time.deltaTime;
+        
+        if (m_bossFireTimer >= m_currentFireInterval)
+        {
+            m_bossFireTimer = 0f;
+            
+            // 根据阶段选择不同的射击模式
+            switch (m_currentBossPhase)
+            {
+                case BossPhase.Phase1_Patrol:
+                    Phase1Shoot();
+                    break;
+                case BossPhase.Phase2_Attack:
+                    Phase2Shoot();
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 第一阶段射击：简单的三发弹幕
+    /// </summary>
+    private void Phase1Shoot()
+    {
+        Vector3 bossPos = m_boss.transform.position;
+        
+        // 创建3个子弹，角度稍微分散
+        int bulletCount = 3;
+        float spreadAngle = 30f; // 总散布角度
+        
+        for (int i = 0; i < bulletCount; i++)
+        {
+            // 计算角度（中间子弹直下，两边分散）
+            float angleOffset = (i - (bulletCount - 1) / 2f) * (spreadAngle / (bulletCount - 1));
+            float currentAngle = 180f + angleOffset; // 180度是正下方
+            
+            // 使用你的子弹生成器生成子弹
+            EnemyBulletGenerator.GenerateBossBullet(bossPos, currentAngle, m_currentBossPhase);
+        }
+    }
+
+    /// <summary>
+    /// 第二阶段射击：复杂的弹幕
+    /// </summary>
+    private void Phase2Shoot()
+    {
+        Vector3 bossPos = m_boss.transform.position;
+        
+        // 模式1：环形弹幕（保持原有）
+        int circleCount = 8;
+        for (int i = 0; i < circleCount; i++)
+        {
+            float angle = 360f * i / circleCount;
+            EnemyBulletGenerator.GenerateBossBullet(bossPos, angle, m_currentBossPhase);
+        }
+        
+        // 模式2：瞄准玩家的扇形弹幕（修改这里！）
+        if (Random.value > 0.5f) // 50%概率发射瞄准弹幕
+        {
+            Vector3 playerPos = GameMgr.instance.GetPlayerPos();
+            if (playerPos != Vector3.zero)
+            {
+                // 获取玩家方向向量
+                Vector3 directionToPlayer = playerPos - bossPos;
+                
+                // 关键修改：使用Atan2计算角度（注意Unity的坐标系）
+                // Atan2(y, x) 返回的角度是相对于X轴正方向
+                // Unity中transform.up是Y轴正方向，需要调整
+                float baseAngle = Mathf.Atan2(directionToPlayer.y, directionToPlayer.x) * Mathf.Rad2Deg;
+                
+                // Unity中0度是X轴正方向（右），但我们子弹的0度是Y轴正方向（上）
+                // 所以需要旋转-90度
+                float aimAngle = baseAngle - 90f;
+                
+                // 扇形分布
+                int aimCount = 5;
+                float aimSpread = 45f; // 扇形总角度
+                
+                for (int i = 0; i < aimCount; i++)
+                {
+                    // 计算每个子弹的角度偏移
+                    float angleOffset = (i - (aimCount - 1) / 2f) * (aimSpread / (aimCount - 1));
+                    float currentAngle = aimAngle + angleOffset;
+                    
+                    // 确保角度在0-360范围内
+                    currentAngle = NormalizeAngle(currentAngle);
+                    
+                    EnemyBulletGenerator.GenerateBossBullet(bossPos, currentAngle, m_currentBossPhase);
+                }
+            }
+        }
+    }
+
+    // 新增辅助方法：规范化角度到0-360度
+    private float NormalizeAngle(float angle)
+    {
+        while (angle < 0) angle += 360f;
+        while (angle >= 360f) angle -= 360f;
+        return angle;
+    }
+
+
+
     #endregion
 
     #region 字段/常量
