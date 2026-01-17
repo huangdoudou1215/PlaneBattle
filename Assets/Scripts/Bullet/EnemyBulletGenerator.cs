@@ -139,7 +139,7 @@ public class EnemyBulletGenerator
         {
             case EnemyGenerator.BossPhase.Phase1_Patrol:
                 // 第一阶段：较慢的子弹
-                bullet.speed = 3f;
+                bullet.speed = 1f;
                 bullet.transform.Rotate(0, 0, angle);
                 bullet.SetTargetDir(bullet.transform.up);
                 bullet.rotateSelf = false;
@@ -148,16 +148,10 @@ public class EnemyBulletGenerator
                 break;
                 
             case EnemyGenerator.BossPhase.Phase2_Attack:
-                // 第二阶段：更快的子弹，可能带有旋转
-                bullet.speed = 5f;
+                // 第二阶段：更快的子弹
+                bullet.speed = 3f;
                 bullet.transform.Rotate(0, 0, angle);
                 bullet.SetTargetDir(bullet.transform.up);
-                
-                // 50%的子弹会旋转
-                // if (Random.value > 0.5f)
-                // {
-                //     bullet.rotateSelf = true;
-                // }
                 
                 // 设置颜色为紫色
                 SetBulletColor(bullet, new Color(0.8f, 0.2f, 0.8f));

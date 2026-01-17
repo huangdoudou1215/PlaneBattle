@@ -67,6 +67,21 @@ public class EnemyGenerator
 
     }
 
+    /// <summary>
+    /// 重置游戏模式状态
+    /// </summary>
+    public void ResetGameMode()
+    {
+        m_inBossMode = false;
+        m_inChannel = false;
+        m_bossSpawned = false;
+        m_channelTimer = 0f;
+        m_bossTimer = 0f;
+        m_timer = 0f;
+        m_boss = null;
+        
+    }
+
     public void ClearAll()
     {
         m_reusePool.Clear();
@@ -254,10 +269,10 @@ public class EnemyGenerator
     }
 
     private BossPhase m_currentBossPhase = BossPhase.Phase1_Patrol;
-    private float m_phase2HealthThreshold = 15f; // 当血量低于15时进入第二阶段
+    private float m_phase2HealthThreshold = 90f; // 当血量低于15时进入第二阶段
     private float m_bossFireTimer = 0f;
     private const float BOSS_FIRE_INTERVAL_PHASE1 = 1f; // 第一阶段射击间隔
-    private const float BOSS_FIRE_INTERVAL_PHASE2 = 0.25f; // 第二阶段射击间隔
+    private const float BOSS_FIRE_INTERVAL_PHASE2 = 0.20f; // 第二阶段射击间隔
     private float m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE1;
 
 
@@ -651,7 +666,7 @@ public class EnemyGenerator
     private const float BOSS_ENTER_CHANCE = 1.00f;      // 每秒进入Boss模式概率
     private const float BOSS_DURATION = 30f;            // Boss模式持续时间
     private const float BOSS_SPAWN_DELAY = 1f;          // 进入Boss模式后延迟生成Boss
-    private const int BOSS_HEALTH = 30;                 // Boss血量
+    private const int BOSS_HEALTH = 100;                 // Boss血量
     private const float BOSS_MOVE_SPEED = 1f;           // Boss下落速度
     private const float BOSS_PATROL_SPEED = 2f;         // 新增：Boss左右巡逻速度
     private const float BOSS_MARGIN = 2f;               // Boss距离屏幕边缘的留空
@@ -683,51 +698,6 @@ public class EnemyGenerator
     public EnemyAircraft GetBoss()
     {
         return m_boss;
-    }
-    #endregion
-
-    #region 调试绘制
-    public void OnDrawGizmos()
-    {
-        if (!Application.isPlaying) return;
-        
-        if (m_inChannel)
-        {
-            // 绘制当前通道位置
-            Vector3 leftPos = new Vector3(m_channelOffset - CHANNEL_WIDTH * 0.5f, 0, 0);
-            Vector3 rightPos = new Vector3(m_channelOffset + CHANNEL_WIDTH * 0.5f, 0, 0);
-            
-            Gizmos.color = Color.green;
-            Gizmos.DrawWireSphere(leftPos, 0.2f);
-            Gizmos.DrawWireSphere(rightPos, 0.2f);
-            
-            // 绘制移动方向指示器
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawLine(new Vector3(m_channelOffset, 1, 0), 
-                            new Vector3(m_channelOffset + m_channelDirection, 1, 0));
-        }
-        
-        if (m_inBossMode && m_boss != null)
-        {
-            // 绘制Boss位置和目标位置
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(m_boss.transform.position, 0.5f);
-            
-            // 绘制目标位置线
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawLine(
-                new Vector3(-GetScreenHalfWidth(), m_bossTargetY, 0),
-                new Vector3(GetScreenHalfWidth(), m_bossTargetY, 0)
-            );
-            
-            // 绘制Boss移动方向
-            if (m_isBossPatrolling)
-            {
-                Gizmos.color = m_bossMoveDirection > 0 ? Color.green : Color.yellow;
-                Gizmos.DrawRay(m_boss.transform.position, 
-                              new Vector3(m_bossMoveDirection * 2, 0, 0));
-            }
-        }
     }
     #endregion
 }

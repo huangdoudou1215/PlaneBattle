@@ -100,6 +100,13 @@ public class GameMgr
     public void RestartGame()
     {
         ClearObjs();
+
+        // 重置游戏模式状态
+        if (m_enemyGenerator != null)
+        {
+            // 调用EnemyGenerator的重置方法
+            m_enemyGenerator.ResetGameMode();
+        }
         StartGame();
     }
 
