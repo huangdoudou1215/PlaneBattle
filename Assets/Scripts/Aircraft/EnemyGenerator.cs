@@ -36,6 +36,15 @@ public class EnemyGenerator
         {
             if (!m_bossSpawned && m_bossTimer >= BOSS_SPAWN_DELAY)
                 SpawnBoss();
+
+
+            // 🆕 检查 Boss 是否死亡
+            if (m_boss != null && m_boss.blood <= 0)
+            {
+                // Boss 死亡，隐藏血条
+                HideBossHealthBar();
+            }
+
             
             m_bossTimer += Time.deltaTime;
             if (m_bossTimer >= BOSS_DURATION || (m_boss != null && m_boss.blood <= 0))
@@ -79,6 +88,9 @@ public class EnemyGenerator
         m_bossTimer = 0f;
         m_timer = 0f;
         m_boss = null;
+
+        // 🆕 隐藏血条
+        HideBossHealthBar();
         
     }
 
@@ -257,6 +269,63 @@ public class EnemyGenerator
     }
     #endregion
 
+    #region Boss血条相关
+
+    private BossHealthBarController bossHealthBar;
+    private bool healthBarInitialized = false;
+
+    /// <summary>
+    /// 初始化血条控制器
+    /// </summary>
+    private void InitializeHealthBar()
+    {
+        if (healthBarInitialized) return;
+        
+        // 通过 GameMgr 或其他方式获取血条控制器
+        // 这里假设 GameMgr 有获取血条的方法
+        var mainGamePanel = GameObject.FindObjectOfType<MainGamePanel>();
+        if (mainGamePanel != null)
+        {
+            bossHealthBar = mainGamePanel.GetComponentInChildren<BossHealthBarController>(true);
+            if (bossHealthBar == null)
+            {
+                Debug.LogWarning("未找到 BossHealthBarController，将在 MainGamePanel 下创建");
+                // 可以在这里动态创建血条
+            }
+        }
+        
+        healthBarInitialized = true;
+    }
+
+    /// <summary>
+    /// 显示Boss血条
+    /// </summary>
+    private void ShowBossHealthBar()
+    {
+        InitializeHealthBar();
+        
+        if (bossHealthBar != null && m_boss != null)
+        {
+            bossHealthBar.ShowBossHealthBar(m_boss);
+            Debug.Log("显示 Boss 血条");
+        }
+    }
+
+    /// <summary>
+    /// 隐藏Boss血条
+    /// </summary>
+    private void HideBossHealthBar()
+    {
+        if (bossHealthBar != null)
+        {
+            bossHealthBar.HideHealthBar();
+            Debug.Log("隐藏 Boss 血条");
+        }
+    }
+
+    #endregion
+
+
     #region Boss模式专属
 
 
@@ -272,8 +341,11 @@ public class EnemyGenerator
     private float m_phase2HealthThreshold = 90f; // 当血量低于15时进入第二阶段
     private float m_bossFireTimer = 0f;
     private const float BOSS_FIRE_INTERVAL_PHASE1 = 1f; // 第一阶段射击间隔
-    private const float BOSS_FIRE_INTERVAL_PHASE2 = 0.20f; // 第二阶段射击间隔
+    private const float BOSS_FIRE_INTERVAL_PHASE2 = 0.40f; // 第二阶段射击间隔
     private float m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE1;
+
+
+
 
 
     /// <summary>
@@ -301,6 +373,10 @@ public class EnemyGenerator
     /// </summary>
     private void ExitBossMode()
     {
+
+        // 🆕 先记录 Boss 是否存活
+        bool bossWasAlive = m_boss != null && m_boss.blood > 0;
+
         m_inBossMode = false;
         
         if (m_boss != null)
@@ -313,6 +389,10 @@ public class EnemyGenerator
         }
         
         m_bossSpawned = false;
+
+        // 🆕 隐藏 Boss 血条
+        HideBossHealthBar();
+
         Debug.Log("退出Boss模式！");
     }
 
@@ -354,6 +434,10 @@ public class EnemyGenerator
         
         m_bossSpawned = true;
         m_isBossMoving = true;
+
+        // 🆕 显示 Boss 血条
+        ShowBossHealthBar();
+
         
         // 初始化左右移动状态
         m_bossMoveDirection = 1f; // 1表示向右，-1表示向左
@@ -570,46 +654,43 @@ public class EnemyGenerator
         Vector3 bossPos = m_boss.transform.position;
         
         // 模式1：环形弹幕（保持原有）
-        int circleCount = 8;
-        for (int i = 0; i < circleCount; i++)
-        {
-            float angle = 360f * i / circleCount;
-            EnemyBulletGenerator.GenerateBossBullet(bossPos, angle, m_currentBossPhase);
-        }
+        // int circleCount = 8;
+        // for (int i = 0; i < circleCount; i++)
+        // {
+        //     float angle = 360f * i / circleCount;
+        //     EnemyBulletGenerator.GenerateBossBullet(bossPos, angle, m_currentBossPhase);
+        // }
         
         // 模式2：瞄准玩家的扇形弹幕（修改这里！）
-        if (Random.value > 0.5f) // 50%概率发射瞄准弹幕
+        Vector3 playerPos = GameMgr.instance.GetPlayerPos();
+        if (playerPos != Vector3.zero)
         {
-            Vector3 playerPos = GameMgr.instance.GetPlayerPos();
-            if (playerPos != Vector3.zero)
+            // 获取玩家方向向量
+            Vector3 directionToPlayer = playerPos - bossPos;
+            
+            // 关键修改：使用Atan2计算角度（注意Unity的坐标系）
+            // Atan2(y, x) 返回的角度是相对于X轴正方向
+            // Unity中transform.up是Y轴正方向，需要调整
+            float baseAngle = Mathf.Atan2(directionToPlayer.y, directionToPlayer.x) * Mathf.Rad2Deg;
+            
+            // Unity中0度是X轴正方向（右），但我们子弹的0度是Y轴正方向（上）
+            // 所以需要旋转-90度
+            float aimAngle = baseAngle - 90f;
+            
+            // 扇形分布
+            int aimCount = 5;
+            float aimSpread = 45f; // 扇形总角度
+            
+            for (int i = 0; i < aimCount; i++)
             {
-                // 获取玩家方向向量
-                Vector3 directionToPlayer = playerPos - bossPos;
+                // 计算每个子弹的角度偏移
+                float angleOffset = (i - (aimCount - 1) / 2f) * (aimSpread / (aimCount - 1));
+                float currentAngle = aimAngle + angleOffset;
                 
-                // 关键修改：使用Atan2计算角度（注意Unity的坐标系）
-                // Atan2(y, x) 返回的角度是相对于X轴正方向
-                // Unity中transform.up是Y轴正方向，需要调整
-                float baseAngle = Mathf.Atan2(directionToPlayer.y, directionToPlayer.x) * Mathf.Rad2Deg;
+                // 确保角度在0-360范围内
+                currentAngle = NormalizeAngle(currentAngle);
                 
-                // Unity中0度是X轴正方向（右），但我们子弹的0度是Y轴正方向（上）
-                // 所以需要旋转-90度
-                float aimAngle = baseAngle - 90f;
-                
-                // 扇形分布
-                int aimCount = 5;
-                float aimSpread = 45f; // 扇形总角度
-                
-                for (int i = 0; i < aimCount; i++)
-                {
-                    // 计算每个子弹的角度偏移
-                    float angleOffset = (i - (aimCount - 1) / 2f) * (aimSpread / (aimCount - 1));
-                    float currentAngle = aimAngle + angleOffset;
-                    
-                    // 确保角度在0-360范围内
-                    currentAngle = NormalizeAngle(currentAngle);
-                    
-                    EnemyBulletGenerator.GenerateBossBullet(bossPos, currentAngle, m_currentBossPhase);
-                }
+                EnemyBulletGenerator.GenerateBossBullet(bossPos, currentAngle, m_currentBossPhase);
             }
         }
     }
