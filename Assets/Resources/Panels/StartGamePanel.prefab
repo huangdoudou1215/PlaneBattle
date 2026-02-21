@@ -410,4 +410,4 @@ MonoBehaviour:
   - name: StartGameBtn
     obj: {fileID: 7607344981518942701}
   - name: StartGameMultiBtn
-    obj: {fileID: 512791693870707994}
+    obj: {fileID: 9156309856226246600}
