@@ -32,6 +32,7 @@ public class MultiplayerModeRuntime : MonoBehaviour
         m_networkManager.transport = transport;
 
         m_networkHud = gameObject.AddComponent<NetworkManagerHUD>();
+        m_networkHud.showGUI = true;
     }
 
     private void OnGUI()
