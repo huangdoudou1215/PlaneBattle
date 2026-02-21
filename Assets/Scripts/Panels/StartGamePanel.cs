@@ -18,5 +18,11 @@ public class StartGamePanel : BasePanel
             // 开始游戏
             GameMgr.instance.StartGame();
         });
+
+        slot.SetButton("StartGameMultiBtn", (btn) =>
+        {
+            // 开始双人联机模式
+            GameMgr.instance.StartMultiplayerMode();
+        });
     }
 }
