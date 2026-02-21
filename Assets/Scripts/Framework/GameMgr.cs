@@ -54,6 +54,18 @@ public class GameMgr
     }
 
     /// <summary>
+    /// 开始双人模式（Mirror）。
+    /// </summary>
+    public void StartMultiplayerMode()
+    {
+        gameState = GameState.Ready;
+
+        // 双人模式与单人玩法解耦，不初始化关卡和敌机系统。
+        PanelMgr.instance.HidePanel<StartGamePanel>();
+        MultiplayerModeRuntime.Enter();
+    }
+
+    /// <summary>
     /// 游戏结束
     /// </summary>
     public void GameOver()
