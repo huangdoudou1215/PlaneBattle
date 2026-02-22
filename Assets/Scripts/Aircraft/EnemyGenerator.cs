@@ -105,13 +105,13 @@ public class EnemyGenerator
         }
     }
 
-    public void KillAllEnemy()
+    public void KillAllEnemy(bool includeBoss = true)
     {
         for (int i = 0; i < m_aliveEnemy.Count; ++i)
             m_aliveEnemy[i].Explode();
         m_aliveEnemy.Clear();
         
-        if (m_boss != null)
+        if (includeBoss && m_boss != null)
         {
             m_boss.Explode();
             m_boss = null;

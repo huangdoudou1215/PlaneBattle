@@ -15,8 +15,11 @@ public class MultiplayerModeRuntime : MonoBehaviour
     private PlaneBattleNetworkManager m_networkManager;
     private PlaneBattleNetworkDiscovery m_networkDiscovery;
     private readonly Dictionary<long, PlaneBattleServerResponse> m_discoveredRooms = new Dictionary<long, PlaneBattleServerResponse>();
+    private readonly List<string> m_chatLines = new List<string>();
     private Vector2 m_scrollPos;
+    private Vector2 m_chatScrollPos;
     private string m_roomName = "My Room";
+    private string m_chatInput = string.Empty;
     private int m_displayPlayers;
     private int m_displayMaxPlayers = 2;
 
@@ -49,6 +52,7 @@ public class MultiplayerModeRuntime : MonoBehaviour
         Debug.Log($"[Discovery] Handshake={m_networkDiscovery.secretHandshake}, Port=47777");
 
         NetworkClient.RegisterHandler<PlaneBattlePlayerCountMessage>(OnPlayerCountMessage, false);
+        PlaneBattleNetworkManager.ChatMessageReceived += OnChatMessageReceived;
     }
 
     private void OnGUI()
@@ -127,14 +131,35 @@ public class MultiplayerModeRuntime : MonoBehaviour
             mode = "当前模式: 服务器";
         }
 
-        GUI.Box(new Rect(10f, 230f, 320f, 100f), "联机状态");
+        GUI.Box(new Rect(10f, 230f, 420f, 330f), "联机状态");
         GUI.Label(new Rect(20f, 260f, 300f, 25f), mode);
 
         int currentPlayers = NetworkServer.active ? m_networkManager.numPlayers : m_displayPlayers;
         int maxPlayers = NetworkServer.active ? m_networkManager.maxConnections : m_displayMaxPlayers;
         GUI.Label(new Rect(20f, 285f, 300f, 25f), $"玩家数: {currentPlayers}/{maxPlayers}");
 
-        if (GUI.Button(new Rect(20f, 335f, 300f, 30f), "退出联机并返回主菜单"))
+        GUILayout.BeginArea(new Rect(20f, 315f, 390f, 180f));
+        m_chatScrollPos = GUILayout.BeginScrollView(m_chatScrollPos, GUI.skin.box);
+        foreach (string line in m_chatLines)
+        {
+            GUILayout.Label(line);
+        }
+        GUILayout.EndScrollView();
+        GUILayout.EndArea();
+
+        m_chatInput = GUI.TextField(new Rect(20f, 505f, 300f, 25f), m_chatInput, 120);
+        if (GUI.Button(new Rect(330f, 505f, 80f, 25f), "发送"))
+        {
+            SendChatMessage();
+        }
+
+        if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return)
+        {
+            SendChatMessage();
+            Event.current.Use();
+        }
+
+        if (GUI.Button(new Rect(20f, 535f, 390f, 20f), "退出联机并返回主菜单"))
         {
             Exit();
         }
@@ -190,6 +215,34 @@ public class MultiplayerModeRuntime : MonoBehaviour
         m_displayMaxPlayers = msg.maxPlayers;
     }
 
+    private void OnChatMessageReceived(PlaneBattleChatBroadcastMessage msg)
+    {
+        m_chatLines.Add($"[{msg.senderName}] {msg.text}");
+        if (m_chatLines.Count > 50)
+        {
+            m_chatLines.RemoveAt(0);
+        }
+
+        m_chatScrollPos.y = float.MaxValue;
+    }
+
+    private void SendChatMessage()
+    {
+        if (!NetworkClient.isConnected)
+        {
+            return;
+        }
+
+        string text = m_chatInput.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        NetworkClient.Send(new PlaneBattleChatSendMessage { text = text });
+        m_chatInput = string.Empty;
+    }
+
     private void Exit()
     {
         if (m_networkDiscovery != null)
@@ -199,6 +252,7 @@ public class MultiplayerModeRuntime : MonoBehaviour
         }
 
         NetworkClient.UnregisterHandler<PlaneBattlePlayerCountMessage>();
+        PlaneBattleNetworkManager.ChatMessageReceived -= OnChatMessageReceived;
 
         if (NetworkServer.active && NetworkClient.isConnected)
         {

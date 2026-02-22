@@ -152,7 +152,8 @@ public class GameMgr
         if (BombCnt <= 0) return;
 
         --BombCnt;
-        m_enemyGenerator.KillAllEnemy();
+        m_enemyGenerator.KillAllEnemy(false);
+        EnemyBulletGenerator.CLear();
     }
 
     /// <summary>

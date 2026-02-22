@@ -1,10 +1,23 @@
 ﻿using Mirror;
+using System;
 using UnityEngine;
 
 public struct PlaneBattlePlayerCountMessage : NetworkMessage
 {
     public int currentPlayers;
     public int maxPlayers;
+}
+
+public struct PlaneBattleChatSendMessage : NetworkMessage
+{
+    public string text;
+}
+
+public struct PlaneBattleChatBroadcastMessage : NetworkMessage
+{
+    public int senderConnectionId;
+    public string senderName;
+    public string text;
 }
 
 /// <summary>
@@ -14,6 +27,9 @@ public class PlaneBattleNetworkManager : NetworkManager
 {
     private const float SpawnYOffset = -3.5f;
     private const string DefaultRoomName = "My Room";
+    private const int MaxChatLength = 120;
+
+    public static event Action<PlaneBattleChatBroadcastMessage> ChatMessageReceived;
 
     public string HostRoomName { get; set; } = DefaultRoomName;
 
@@ -40,6 +56,30 @@ public class PlaneBattleNetworkManager : NetworkManager
         {
             spawnPrefabs.Add(playerPrefab);
         }
+    }
+
+    public override void OnStartServer()
+    {
+        base.OnStartServer();
+        NetworkServer.RegisterHandler<PlaneBattleChatSendMessage>(OnServerChatMessageReceived);
+    }
+
+    public override void OnStopServer()
+    {
+        NetworkServer.UnregisterHandler<PlaneBattleChatSendMessage>();
+        base.OnStopServer();
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+        NetworkClient.RegisterHandler<PlaneBattleChatBroadcastMessage>(OnClientChatMessageReceived, false);
+    }
+
+    public override void OnStopClient()
+    {
+        NetworkClient.UnregisterHandler<PlaneBattleChatBroadcastMessage>();
+        base.OnStopClient();
     }
 
     public override void OnClientConnect()
@@ -89,5 +129,44 @@ public class PlaneBattleNetworkManager : NetworkManager
         };
 
         NetworkServer.SendToAll(msg);
+    }
+
+    private void OnServerChatMessageReceived(NetworkConnectionToClient conn, PlaneBattleChatSendMessage msg)
+    {
+        string text = NormalizeChatText(msg.text);
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        PlaneBattleChatBroadcastMessage broadcast = new PlaneBattleChatBroadcastMessage
+        {
+            senderConnectionId = conn.connectionId,
+            senderName = conn.connectionId == 0 ? "Host" : $"P{conn.connectionId}",
+            text = text
+        };
+
+        NetworkServer.SendToAll(broadcast);
+    }
+
+    private void OnClientChatMessageReceived(PlaneBattleChatBroadcastMessage msg)
+    {
+        ChatMessageReceived?.Invoke(msg);
+    }
+
+    private string NormalizeChatText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        string normalized = text.Trim();
+        if (normalized.Length > MaxChatLength)
+        {
+            normalized = normalized.Substring(0, MaxChatLength);
+        }
+
+        return normalized;
     }
 }
