@@ -1,5 +1,11 @@
-using Mirror;
+﻿using Mirror;
 using UnityEngine;
+
+public struct PlaneBattlePlayerCountMessage : NetworkMessage
+{
+    public int currentPlayers;
+    public int maxPlayers;
+}
 
 /// <summary>
 /// 双人模式网络管理器。
@@ -7,11 +13,19 @@ using UnityEngine;
 public class PlaneBattleNetworkManager : NetworkManager
 {
     private const float SpawnYOffset = -3.5f;
+    private const string DefaultRoomName = "My Room";
+
+    public string HostRoomName { get; set; } = DefaultRoomName;
 
     public override void Awake()
     {
         base.Awake();
         autoCreatePlayer = false;
+
+        if (string.IsNullOrWhiteSpace(HostRoomName))
+        {
+            HostRoomName = DefaultRoomName;
+        }
 
         if (playerPrefab == null)
         {
@@ -57,5 +71,23 @@ public class PlaneBattleNetworkManager : NetworkManager
         }
 
         NetworkServer.AddPlayerForConnection(conn, player);
+        BroadcastPlayerCount();
+    }
+
+    public override void OnServerDisconnect(NetworkConnectionToClient conn)
+    {
+        base.OnServerDisconnect(conn);
+        BroadcastPlayerCount();
+    }
+
+    private void BroadcastPlayerCount()
+    {
+        PlaneBattlePlayerCountMessage msg = new PlaneBattlePlayerCountMessage
+        {
+            currentPlayers = numPlayers,
+            maxPlayers = maxConnections
+        };
+
+        NetworkServer.SendToAll(msg);
     }
 }
