@@ -144,6 +144,7 @@ public class EnemyGenerator
             };
         }
         enemy.blood = config.Blood;
+        enemy.isBoss = false;
         enemy.moveSpeed = Random.Range(config.MinSpeed, config.MaxSpeed);
         enemy.ResetTimeToFire(1);
         enemy.RandomStartPos();
@@ -235,6 +236,7 @@ public class EnemyGenerator
 
         // 固定最小飞机数值
         enemy.blood = 1;
+        enemy.isBoss = false;
         enemy.moveSpeed = 2f;
         enemy.ResetTimeToFire(1);
 
@@ -334,15 +336,24 @@ public class EnemyGenerator
     {
         Phase1_Patrol,     // 第一阶段：巡逻移动
         Phase2_Attack,     // 第二阶段：发射弹幕
-        Phase3_Final       // 第三阶段：狂暴模式（可选）
+        Phase3_Charge      // 第三阶段：冲锋追击（不再发弹幕）
     }
 
     private BossPhase m_currentBossPhase = BossPhase.Phase1_Patrol;
-    private float m_phase2HealthThreshold = 90f; // 当血量低于15时进入第二阶段
+    private float m_phase2HealthThreshold = 90f;
+    private float m_phase3HealthThreshold = 20f;
     private float m_bossFireTimer = 0f;
-    private const float BOSS_FIRE_INTERVAL_PHASE1 = 1f; // 第一阶段射击间隔
-    private const float BOSS_FIRE_INTERVAL_PHASE2 = 0.40f; // 第二阶段射击间隔
+    private const float BOSS_FIRE_INTERVAL_PHASE1 = 1f;
+    private const float BOSS_FIRE_INTERVAL_PHASE2 = 0.40f;
     private float m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE1;
+    private int m_phase2PatternIndex = 0;
+
+    private bool m_isBossCharging = false;
+    private Vector3 m_chargeDirection = Vector3.down;
+    private Vector3 m_chargeTargetPos = Vector3.zero;
+    private float m_chargeTimer = 0f;
+    private float m_chargeCooldownTimer = 0f;
+    private float m_afterimageTimer = 0f;
 
 
 
@@ -361,6 +372,11 @@ public class EnemyGenerator
         m_currentBossPhase = BossPhase.Phase1_Patrol;
         m_bossFireTimer = 0f;
         m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE1;
+        m_phase2PatternIndex = 0;
+        m_isBossCharging = false;
+        m_chargeTimer = 0f;
+        m_chargeCooldownTimer = 0f;
+        m_afterimageTimer = 0f;
         
         Debug.Log("进入Boss模式！");
         
@@ -406,7 +422,9 @@ public class EnemyGenerator
         
         // 设置Boss属性
         m_boss.blood = BOSS_HEALTH;
+        m_boss.isBoss = true;
         m_boss.moveSpeed = BOSS_MOVE_SPEED;
+        m_boss.moveSpeedX = BOSS_PATROL_SPEED;
         m_boss.ResetTimeToFire(-1); // 不发射子弹
         
         // 修改颜色为红色
@@ -455,6 +473,13 @@ public class EnemyGenerator
 
         // 检查阶段转换
         CheckBossPhase();
+
+        if (m_currentBossPhase == BossPhase.Phase3_Charge)
+        {
+            UpdateBossChargeMovement();
+            UpdateBossShooting();
+            return;
+        }
         
         Vector3 currentPos = m_boss.transform.position;
         
@@ -510,7 +535,7 @@ public class EnemyGenerator
         else if (m_isBossPatrolling)
         {
             // 如果移动速度为0，设置巡逻速度
-            if (m_boss.moveSpeed == 0f)
+            if (m_boss.moveSpeedX == 0f)
             {
                 m_boss.moveSpeedX = BOSS_PATROL_SPEED;
             }
@@ -522,10 +547,6 @@ public class EnemyGenerator
             
             // 检查屏幕边界
             float screenHalfWidth = GetScreenHalfWidth();
-            float screenWidth = screenHalfWidth * 2;
-            
-            // 转换为屏幕坐标检查边界
-            Vector3 screenPos = Camera.main.WorldToScreenPoint(currentPos);
             
             // 获取Boss碰撞体半径（如果没有碰撞体，使用一个估计值）
             float bossRadius = BOSS_RADIUS;
@@ -561,12 +582,60 @@ public class EnemyGenerator
     private void CheckBossPhase()
     {
         if (m_boss == null) return;
-        
-        // 第一阶段：血量高于阈值
+
+        if (m_boss.blood <= 0) return;
+        if (m_currentBossPhase == BossPhase.Phase3_Charge && m_boss.blood <= m_phase3HealthThreshold) return;
+
+        // 第三阶段：低血量冲锋（不再发弹幕）
+        if (m_boss.blood <= m_phase3HealthThreshold && m_currentBossPhase != BossPhase.Phase3_Charge)
+        {
+            m_currentBossPhase = BossPhase.Phase3_Charge;
+            m_currentFireInterval = 9999f;
+            m_bossFireTimer = 0f;
+            m_isBossMoving = false;
+            m_isBossPatrolling = false;
+            m_isBossCharging = false;
+            m_chargeTargetPos = m_boss.transform.position;
+            m_chargeCooldownTimer = BOSS_CHARGE_COOLDOWN;
+            m_afterimageTimer = 0f;
+            m_boss.moveSpeed = 0f;
+            m_boss.moveSpeedX = 0f;
+
+            SpriteRenderer renderer = m_boss.GetComponent<SpriteRenderer>();
+            if (renderer != null)
+            {
+                renderer.color = new Color(1.0f, 0.55f, 0.2f);
+            }
+
+            Debug.Log("Boss进入第三阶段：冲锋模式（停止弹幕）！");
+            return;
+        }
+
+        // 第二阶段：低于90%血量，开始多模式弹幕
+        if (m_boss.blood <= m_phase2HealthThreshold && m_boss.blood > m_phase3HealthThreshold && m_currentBossPhase != BossPhase.Phase2_Attack)
+        {
+            m_currentBossPhase = BossPhase.Phase2_Attack;
+            m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE2;
+            m_isBossPatrolling = true;
+            m_boss.moveSpeedX = BOSS_PATROL_SPEED * 2.4f;
+            m_phase2PatternIndex = 0;
+            Debug.Log("Boss进入第二阶段：多模式弹幕攻击！");
+            
+            SpriteRenderer renderer = m_boss.GetComponent<SpriteRenderer>();
+            if (renderer != null)
+            {
+                renderer.color = new Color(0.8f, 0.2f, 0.8f);
+            }
+            return;
+        }
+
+        // 第一阶段：血量高于90%
         if (m_boss.blood > m_phase2HealthThreshold && m_currentBossPhase != BossPhase.Phase1_Patrol)
         {
             m_currentBossPhase = BossPhase.Phase1_Patrol;
             m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE1;
+            m_isBossPatrolling = true;
+            m_boss.moveSpeedX = BOSS_PATROL_SPEED;
             Debug.Log("Boss进入第一阶段：巡逻模式");
             
             // 可以改变颜色
@@ -576,23 +645,6 @@ public class EnemyGenerator
                 renderer.color = Color.red;
             }
         }
-        // 第二阶段：血量低于阈值
-        else if (m_boss.blood <= m_phase2HealthThreshold && m_boss.blood > 0 && m_currentBossPhase != BossPhase.Phase2_Attack)
-        {
-            m_currentBossPhase = BossPhase.Phase2_Attack;
-            m_currentFireInterval = BOSS_FIRE_INTERVAL_PHASE2;
-            Debug.Log("Boss进入第二阶段：弹幕攻击模式！");
-            
-            // 改变颜色为紫色表示狂暴
-            SpriteRenderer renderer = m_boss.GetComponent<SpriteRenderer>();
-            if (renderer != null)
-            {
-                renderer.color = new Color(0.8f, 0.2f, 0.8f); // 紫色
-            }
-            
-            // 增加移动速度
-            m_boss.moveSpeedX = BOSS_PATROL_SPEED * 3.0f;
-        }
     }
 
     /// <summary>
@@ -601,6 +653,7 @@ public class EnemyGenerator
     private void UpdateBossShooting()
     {
         if (m_boss == null || !m_bossSpawned) return;
+        if (m_currentBossPhase == BossPhase.Phase3_Charge) return;
         
         // 只有到达巡逻位置后才开始射击
         if (!m_isBossPatrolling || m_isBossMoving) return;
@@ -652,47 +705,169 @@ public class EnemyGenerator
     private void Phase2Shoot()
     {
         Vector3 bossPos = m_boss.transform.position;
-        
-        // 模式1：环形弹幕（保持原有）
-        // int circleCount = 8;
-        // for (int i = 0; i < circleCount; i++)
-        // {
-        //     float angle = 360f * i / circleCount;
-        //     EnemyBulletGenerator.GenerateBossBullet(bossPos, angle, m_currentBossPhase);
-        // }
-        
-        // 模式2：瞄准玩家的扇形弹幕（修改这里！）
-        Vector3 playerPos = GameMgr.instance.GetPlayerPos();
-        if (playerPos != Vector3.zero)
+
+        switch (m_phase2PatternIndex % 4)
         {
-            // 获取玩家方向向量
-            Vector3 directionToPlayer = playerPos - bossPos;
-            
-            // 关键修改：使用Atan2计算角度（注意Unity的坐标系）
-            // Atan2(y, x) 返回的角度是相对于X轴正方向
-            // Unity中transform.up是Y轴正方向，需要调整
-            float baseAngle = Mathf.Atan2(directionToPlayer.y, directionToPlayer.x) * Mathf.Rad2Deg;
-            
-            // Unity中0度是X轴正方向（右），但我们子弹的0度是Y轴正方向（上）
-            // 所以需要旋转-90度
-            float aimAngle = baseAngle - 90f;
-            
-            // 扇形分布
-            int aimCount = 5;
-            float aimSpread = 45f; // 扇形总角度
-            
-            for (int i = 0; i < aimCount; i++)
-            {
-                // 计算每个子弹的角度偏移
-                float angleOffset = (i - (aimCount - 1) / 2f) * (aimSpread / (aimCount - 1));
-                float currentAngle = aimAngle + angleOffset;
-                
-                // 确保角度在0-360范围内
-                currentAngle = NormalizeAngle(currentAngle);
-                
-                EnemyBulletGenerator.GenerateBossBullet(bossPos, currentAngle, m_currentBossPhase);
-            }
+            case 0:
+                FireAimedFan(bossPos);
+                break;
+            case 1:
+                FireSpiralBurst(bossPos);
+                break;
+            case 2:
+                FireCrossBurst(bossPos);
+                break;
+            default:
+                FireWaveBarrage(bossPos);
+                break;
         }
+
+        m_phase2PatternIndex++;
+    }
+
+    private void FireAimedFan(Vector3 bossPos)
+    {
+        Vector3 playerPos = GameMgr.instance.GetPlayerPos();
+        if (playerPos == Vector3.zero)
+        {
+            playerPos = bossPos + Vector3.down;
+        }
+
+        Vector3 directionToPlayer = playerPos - bossPos;
+        float baseAngle = Mathf.Atan2(directionToPlayer.y, directionToPlayer.x) * Mathf.Rad2Deg - 90f;
+
+        int bulletCount = 7;
+        float spread = 70f;
+        for (int i = 0; i < bulletCount; i++)
+        {
+            float offset = (i - (bulletCount - 1) * 0.5f) * (spread / (bulletCount - 1));
+            float angle = NormalizeAngle(baseAngle + offset);
+            EnemyBulletGenerator.GenerateBossBulletCustom(
+                bossPos, angle, 3.2f, new Color(0.85f, 0.25f, 0.9f), false, false);
+        }
+    }
+
+    private void FireSpiralBurst(Vector3 bossPos)
+    {
+        float baseAngle = NormalizeAngle(m_phase2PatternIndex * 22f);
+        int bulletCount = 10;
+        for (int i = 0; i < bulletCount; i++)
+        {
+            float angle = NormalizeAngle(baseAngle + i * (360f / bulletCount));
+            EnemyBulletGenerator.GenerateBossBulletCustom(
+                bossPos, angle, 2.6f, new Color(0.95f, 0.35f, 0.55f), true, false);
+        }
+    }
+
+    private void FireCrossBurst(Vector3 bossPos)
+    {
+        float[] angles = { 160f, 180f, 200f, 225f, 135f };
+        for (int i = 0; i < angles.Length; i++)
+        {
+            EnemyBulletGenerator.GenerateBossBulletCustom(
+                bossPos, angles[i], 3.0f, new Color(0.35f, 0.8f, 1f), false, false);
+        }
+    }
+
+    private void FireWaveBarrage(Vector3 bossPos)
+    {
+        int bulletCount = 8;
+        float startAngle = 145f;
+        float endAngle = 215f;
+        for (int i = 0; i < bulletCount; i++)
+        {
+            float t = bulletCount == 1 ? 0f : (float)i / (bulletCount - 1);
+            float angle = Mathf.Lerp(startAngle, endAngle, t);
+            EnemyBulletGenerator.GenerateBossBulletCustom(
+                bossPos,
+                angle,
+                2.8f,
+                new Color(1f, 0.75f, 0.25f),
+                false,
+                false);
+        }
+    }
+
+    private void UpdateBossChargeMovement()
+    {
+        if (m_boss == null) return;
+        m_boss.moveSpeed = 0f;
+        m_boss.moveSpeedX = 0f;
+
+        Vector3 currentPos = m_boss.transform.position;
+        float camX = Camera.main.transform.position.x;
+        float camY = Camera.main.transform.position.y;
+        float leftBoundary = camX - GetScreenHalfWidth() + BOSS_RADIUS;
+        float rightBoundary = camX + GetScreenHalfWidth() - BOSS_RADIUS;
+        float topBoundary = Camera.main.transform.position.y + Camera.main.orthographicSize - BOSS_RADIUS * 0.5f;
+        float bottomBoundary = camY - Camera.main.orthographicSize + BOSS_RADIUS * 1.2f;
+
+        if (!m_isBossCharging)
+        {
+            m_chargeCooldownTimer += Time.deltaTime;
+            if (m_chargeCooldownTimer >= BOSS_CHARGE_COOLDOWN)
+            {
+                Vector3 playerPos = GameMgr.instance.GetPlayerPos();
+                if (playerPos == Vector3.zero)
+                {
+                    playerPos = currentPos + Vector3.down * 2f;
+                }
+
+                m_chargeTargetPos = new Vector3(
+                    Mathf.Clamp(playerPos.x, leftBoundary, rightBoundary),
+                    Mathf.Clamp(playerPos.y, bottomBoundary, topBoundary),
+                    currentPos.z);
+
+                Vector3 targetDir = (m_chargeTargetPos - currentPos).normalized;
+                m_chargeDirection = targetDir.sqrMagnitude > 0.0001f ? targetDir : Vector3.down;
+                m_isBossCharging = true;
+                m_chargeTimer = 0f;
+                m_afterimageTimer = BOSS_AFTERIMAGE_INTERVAL;
+                m_chargeCooldownTimer = 0f;
+            }
+            return;
+        }
+
+        m_chargeTimer += Time.deltaTime;
+        m_afterimageTimer += Time.deltaTime;
+
+        currentPos = Vector3.MoveTowards(currentPos, m_chargeTargetPos, BOSS_CHARGE_SPEED * Time.deltaTime);
+
+        m_boss.transform.position = currentPos;
+
+        if (m_afterimageTimer >= BOSS_AFTERIMAGE_INTERVAL)
+        {
+            m_afterimageTimer = 0f;
+            SpawnBossAfterimage();
+        }
+
+        if (m_chargeTimer >= BOSS_CHARGE_DURATION || Vector3.Distance(currentPos, m_chargeTargetPos) <= 0.05f)
+        {
+            m_isBossCharging = false;
+            m_chargeTimer = 0f;
+        }
+    }
+
+    private void SpawnBossAfterimage()
+    {
+        if (m_boss == null) return;
+
+        SpriteRenderer bossRenderer = m_boss.GetComponent<SpriteRenderer>();
+        if (bossRenderer == null || bossRenderer.sprite == null) return;
+
+        GameObject afterimage = new GameObject("BossAfterimage");
+        afterimage.transform.position = m_boss.transform.position;
+        afterimage.transform.rotation = m_boss.transform.rotation;
+        afterimage.transform.localScale = m_boss.transform.localScale;
+
+        SpriteRenderer renderer = afterimage.AddComponent<SpriteRenderer>();
+        renderer.sprite = bossRenderer.sprite;
+        renderer.sortingLayerID = bossRenderer.sortingLayerID;
+        renderer.sortingOrder = bossRenderer.sortingOrder - 1;
+        renderer.color = new Color(1f, 0.5f, 0.2f, 0.45f);
+
+        BossAfterimage fade = afterimage.AddComponent<BossAfterimage>();
+        fade.Init(renderer, BOSS_AFTERIMAGE_LIFETIME);
     }
 
     // 新增辅助方法：规范化角度到0-360度
@@ -752,6 +927,11 @@ public class EnemyGenerator
     private const float BOSS_PATROL_SPEED = 2f;         // 新增：Boss左右巡逻速度
     private const float BOSS_MARGIN = 2f;               // Boss距离屏幕边缘的留空
     private const float BOSS_RADIUS = 1.5f;             // 新增：Boss碰撞体半径（用于边界检测）
+    private const float BOSS_CHARGE_SPEED = 8.5f;       // 冲锋速度
+    private const float BOSS_CHARGE_DURATION = 1.1f;    // 单次冲锋时长
+    private const float BOSS_CHARGE_COOLDOWN = 0.45f;   // 冲锋间隔
+    private const float BOSS_AFTERIMAGE_INTERVAL = 0.06f;
+    private const float BOSS_AFTERIMAGE_LIFETIME = 0.28f;
     #endregion
 
     #region 公共方法
@@ -781,4 +961,44 @@ public class EnemyGenerator
         return m_boss;
     }
     #endregion
+}
+
+/// <summary>
+/// Boss 冲锋残影：短时间淡出后销毁。
+/// </summary>
+public class BossAfterimage : MonoBehaviour
+{
+    private SpriteRenderer m_renderer;
+    private float m_lifetime = 0.25f;
+    private float m_elapsed = 0f;
+    private Color m_initialColor = Color.white;
+
+    public void Init(SpriteRenderer renderer, float lifetime)
+    {
+        m_renderer = renderer;
+        m_lifetime = Mathf.Max(0.01f, lifetime);
+        m_elapsed = 0f;
+        if (m_renderer != null)
+        {
+            m_initialColor = m_renderer.color;
+        }
+    }
+
+    private void Update()
+    {
+        m_elapsed += Time.deltaTime;
+        float t = Mathf.Clamp01(m_elapsed / m_lifetime);
+
+        if (m_renderer != null)
+        {
+            Color c = m_initialColor;
+            c.a = Mathf.Lerp(m_initialColor.a, 0f, t);
+            m_renderer.color = c;
+        }
+
+        if (m_elapsed >= m_lifetime)
+        {
+            Destroy(gameObject);
+        }
+    }
 }

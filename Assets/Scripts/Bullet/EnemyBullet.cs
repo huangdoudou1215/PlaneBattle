@@ -65,15 +65,24 @@ public class EnemyBullet : MonoBehaviour
         curveAmplitude = amplitude;
         curveFrequency = frequency;
         curveTimer = 0f;
-        originalDirection = m_targetDir;
+        originalDirection = m_targetDir.normalized;
     }
 
     private void Update()
     {
         if (GameState.Pause == GameMgr.instance.gameState) return;
 
-        // 子弹向上飞行
-        m_selfTrans.position += m_targetDir * speed * Time.deltaTime;
+        Vector3 moveDir = m_targetDir;
+        if (useCurveMove)
+        {
+            curveTimer += Time.deltaTime;
+            Vector3 sideDir = new Vector3(-originalDirection.y, originalDirection.x, 0f);
+            float wave = Mathf.Sin(curveTimer * curveFrequency) * curveAmplitude;
+            moveDir = (originalDirection + sideDir * wave).normalized;
+        }
+
+        // 子弹飞行
+        m_selfTrans.position += moveDir * speed * Time.deltaTime;
 
         // 超过屏幕外面
         var screenPos = Camera.main.WorldToScreenPoint(m_selfTrans.position);

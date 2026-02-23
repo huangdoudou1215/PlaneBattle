@@ -8,6 +8,7 @@ public class EnemyAircraft : BaseAircraft
 {
     public float moveSpeed = 0;
     public float moveSpeedX = 0;
+    public bool isBoss = false;
     public Action backToPoolAction;
     private bool m_underAttack = false;
     private float m_timeToFire = -1;
@@ -79,8 +80,11 @@ public class EnemyAircraft : BaseAircraft
         }
         else if ("Player" == other.tag)
         {
-            // 与玩家碰撞，直接爆炸
-            Explode();
+            // Boss 与玩家碰撞时不自爆，只让玩家按原有逻辑受伤
+            if (!isBoss)
+            {
+                Explode();
+            }
         }
     }
 

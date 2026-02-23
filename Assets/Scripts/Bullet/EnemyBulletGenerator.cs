@@ -104,6 +104,8 @@ public class EnemyBulletGenerator
         bullet.speed = 5f;
         bullet.SetStartPos(startPos);
         bullet.SetAngles(Vector3.zero);
+        bullet.rotateSelf = false;
+        bullet.SetCurveMove(false);
         bullet.ActiveSelf(true);
         return bullet;
     }
@@ -126,37 +128,45 @@ public class EnemyBulletGenerator
     /// </summary>
     public static void GenerateBossBullet(Vector3 bossPos, float angle, EnemyGenerator.BossPhase phase)
     {
+        // 根据阶段设置不同的子弹属性
+        switch (phase)
+        {
+            case EnemyGenerator.BossPhase.Phase1_Patrol:
+                GenerateBossBulletCustom(bossPos, angle, 1f, Color.red, false, false);
+                break;
+                
+            case EnemyGenerator.BossPhase.Phase2_Attack:
+                GenerateBossBulletCustom(bossPos, angle, 3f, new Color(0.8f, 0.2f, 0.8f), false, false);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 自定义Boss子弹参数，供复杂弹幕模式调用
+    /// </summary>
+    public static void GenerateBossBulletCustom(
+        Vector3 bossPos,
+        float angle,
+        float speed,
+        Color color,
+        bool rotateSelf,
+        bool useCurveMove,
+        float curveAmplitude = 0.35f,
+        float curveFrequency = 6f)
+    {
         if (null == s_enemyBulletRoot)
         {
             var rootObj = new GameObject("EnemyBulletRoot");
             s_enemyBulletRoot = rootObj.transform;
         }
-        
+
         var bullet = CreateBulletObj(bossPos);
-        
-        // 根据阶段设置不同的子弹属性
-        switch (phase)
-        {
-            case EnemyGenerator.BossPhase.Phase1_Patrol:
-                // 第一阶段：较慢的子弹
-                bullet.speed = 1f;
-                bullet.transform.Rotate(0, 0, angle);
-                bullet.SetTargetDir(bullet.transform.up);
-                bullet.rotateSelf = false;
-                // 设置颜色为红色
-                SetBulletColor(bullet, Color.red);
-                break;
-                
-            case EnemyGenerator.BossPhase.Phase2_Attack:
-                // 第二阶段：更快的子弹
-                bullet.speed = 3f;
-                bullet.transform.Rotate(0, 0, angle);
-                bullet.SetTargetDir(bullet.transform.up);
-                
-                // 设置颜色为紫色
-                SetBulletColor(bullet, new Color(0.8f, 0.2f, 0.8f));
-                break;
-        }
+        bullet.speed = speed;
+        bullet.transform.Rotate(0, 0, angle);
+        bullet.SetTargetDir(bullet.transform.up);
+        bullet.rotateSelf = rotateSelf;
+        bullet.SetCurveMove(useCurveMove, curveAmplitude, curveFrequency);
+        SetBulletColor(bullet, color);
     }
 
     /// <summary>
