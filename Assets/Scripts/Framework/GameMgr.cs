@@ -48,6 +48,8 @@ public class GameMgr
 
         // 初始化核弹生成器
         m_superBombGenerator.Init();
+        // 初始化子弹补给生成器
+        m_superBulletGenerator.Init();
 
 
         gameState = GameState.Playing;
@@ -104,6 +106,9 @@ public class GameMgr
         m_enemyGenerator.ClearAll();
         // 清空所有子弹
         EnemyBulletGenerator.CLear();
+        // 清理道具根节点
+        m_superBombGenerator.DestroyRoot();
+        m_superBulletGenerator.DestroyRoot();
     }
 
     /// <summary>
@@ -141,6 +146,7 @@ public class GameMgr
         {
             m_enemyGenerator.Update();
             m_superBombGenerator.Update();
+            m_superBulletGenerator.Update();
         }
     }
 
@@ -171,6 +177,7 @@ public class GameMgr
 
     private EnemyGenerator m_enemyGenerator = new EnemyGenerator();
     private SuperBombGenerator m_superBombGenerator = new SuperBombGenerator();
+    private SuperBulletGenerator m_superBulletGenerator = new SuperBulletGenerator();
 
     public BaseAircraft player;
 

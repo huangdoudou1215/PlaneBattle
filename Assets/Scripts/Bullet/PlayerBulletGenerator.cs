@@ -28,6 +28,16 @@ public class PlayerBulletGenerator
     /// </summary>
     public Transform m_playerTrans;
 
+    /// <summary>
+    /// 额外并行子弹数量（初始单发，+1 表示双发，以此类推）
+    /// </summary>
+    private int m_parallelExtraCount;
+
+    /// <summary>
+    /// 并行子弹之间的水平间距
+    /// </summary>
+    private const float PARALLEL_BULLET_X_OFFSET = 0.35f;
+
     public void Init(Transform player)
     {
         m_playerTrans = player;
@@ -40,20 +50,41 @@ public class PlayerBulletGenerator
         if (m_timer >= FIRE_INTERVAL)
         {
             m_timer = 0;
-            CreateBullet();
+            CreateBullets();
         }
     }
 
     /// <summary>
-    /// 创建子弹
+    /// 叠加一层平行子弹
     /// </summary>
-    private void CreateBullet()
+    public void AddParallelBullet()
+    {
+        ++m_parallelExtraCount;
+    }
+
+    /// <summary>
+    /// 创建子弹（支持并行多发）
+    /// </summary>
+    private void CreateBullets()
     {
         if (null == m_bulletRoot)
         {
             var rootObj = new GameObject("PlayerBulletRoot");
             m_bulletRoot = rootObj.transform;
         }
+
+        int bulletCount = 1 + m_parallelExtraCount;
+        float centerIndex = (bulletCount - 1) * 0.5f;
+        Vector3 basePos = m_playerTrans.position + new Vector3(0, 0.7f, 0);
+        for (int i = 0; i < bulletCount; ++i)
+        {
+            float xOffset = (i - centerIndex) * PARALLEL_BULLET_X_OFFSET;
+            CreateSingleBullet(basePos + new Vector3(xOffset, 0, 0));
+        }
+    }
+
+    private void CreateSingleBullet(Vector3 startPos)
+    {
         PlayerBullet bullet = null;
         if (m_reusePool.Count > 0)
         {
@@ -77,8 +108,7 @@ public class PlayerBulletGenerator
                 m_reusePool.Enqueue(bullet);
             };
         }
-        // 设置子弹的初始位置为飞机的位置，注意加一个y轴的偏移，使子弹在飞机头的位置
-        bullet.SetStartPos(m_playerTrans.position + new Vector3(0, 0.7f, 0));
+        bullet.SetStartPos(startPos);
     }
 
     /// <summary>

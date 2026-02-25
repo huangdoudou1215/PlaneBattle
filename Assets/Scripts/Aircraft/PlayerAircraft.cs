@@ -125,6 +125,12 @@ public class PlayerAircraft : BaseAircraft
                     ++GameMgr.instance.BombCnt;
                 }
                 break;
+            case "SuperBullet":
+                {
+                    Destroy(other.gameObject);
+                    m_bulletGenerator.AddParallelBullet();
+                }
+                break;
         }
     }
 
