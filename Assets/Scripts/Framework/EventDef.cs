@@ -23,4 +23,14 @@ public class EventDef
     /// 更新玩家生命数
     /// </summary>
     public const string EVENT_UPDATE_LIFE_CNT = "EVENT_UPDATE_LIFE_CNT";
+
+    /// <summary>
+    /// 更新经验与等级
+    /// </summary>
+    public const string EVENT_UPDATE_EXP = "EVENT_UPDATE_EXP";
+
+    /// <summary>
+    /// 升级待选状态变化
+    /// </summary>
+    public const string EVENT_LEVEL_UP_AVAILABLE = "EVENT_LEVEL_UP_AVAILABLE";
 }

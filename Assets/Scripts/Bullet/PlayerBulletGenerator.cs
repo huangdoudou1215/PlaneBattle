@@ -11,7 +11,7 @@ public class PlayerBulletGenerator
     /// <summary>
     /// 开炮间隔
     /// </summary>
-    private const float FIRE_INTERVAL = 0.1f;
+    private float m_fireInterval = 0.1f;
 
     /// <summary>
     /// 对象池
@@ -37,6 +37,10 @@ public class PlayerBulletGenerator
     /// 并行子弹之间的水平间距
     /// </summary>
     private const float PARALLEL_BULLET_X_OFFSET = 0.35f;
+    /// <summary>
+    /// 子弹伤害
+    /// </summary>
+    private int m_bulletPower = 1;
 
     public void Init(Transform player)
     {
@@ -47,7 +51,7 @@ public class PlayerBulletGenerator
     {
         if (null == m_playerTrans) return;
         m_timer += Time.deltaTime;
-        if (m_timer >= FIRE_INTERVAL)
+        if (m_timer >= m_fireInterval)
         {
             m_timer = 0;
             CreateBullets();
@@ -60,6 +64,16 @@ public class PlayerBulletGenerator
     public void AddParallelBullet()
     {
         ++m_parallelExtraCount;
+    }
+
+    public void ReduceFireInterval(float delta)
+    {
+        m_fireInterval = Mathf.Max(0.03f, m_fireInterval - Mathf.Abs(delta));
+    }
+
+    public void AddBulletPower()
+    {
+        ++m_bulletPower;
     }
 
     /// <summary>
@@ -99,7 +113,6 @@ public class PlayerBulletGenerator
             var obj = Object.Instantiate(prefab);
             obj.transform.SetParent(m_bulletRoot, false);
             bullet = obj.GetComponent<PlayerBullet>();
-            bullet.power = 1;
             bullet.speed = 7f;
             // 子弹回收
             bullet.backToPoolAction = () =>
@@ -108,6 +121,7 @@ public class PlayerBulletGenerator
                 m_reusePool.Enqueue(bullet);
             };
         }
+        bullet.power = m_bulletPower;
         bullet.SetStartPos(startPos);
     }
 

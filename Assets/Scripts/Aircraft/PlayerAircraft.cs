@@ -19,6 +19,11 @@ public class PlayerAircraft : BaseAircraft
 
     // 是否正在爆炸动画中
     private bool m_isExploding = false;
+    // 护盾层数
+    private int m_shieldCount = 0;
+    // 护盾视觉
+    private SpriteRenderer m_shieldFxRenderer;
+    private Transform m_shieldFxTrans;
 
     protected override void Awake()
     {
@@ -48,6 +53,7 @@ public class PlayerAircraft : BaseAircraft
         };
 
         m_bulletGenerator.Init(m_selfTrans);
+        CreateShieldFx();
     }
 
     // 移除 OnMouseDown 和 OnMouseUp 方法，因为不再需要鼠标事件
@@ -102,6 +108,7 @@ public class PlayerAircraft : BaseAircraft
 
         // 子弹生成器
         m_bulletGenerator.Update();
+        UpdateShieldFx();
     }
 
     /// <summary>
@@ -110,12 +117,28 @@ public class PlayerAircraft : BaseAircraft
     /// <param name="other"></param>
     public override void OnTriggerEnter2D(Collider2D other)
     {
+        var expOrb = other.GetComponent<ExperienceOrb>();
+        if (expOrb != null)
+        {
+            expOrb.Collect();
+            return;
+        }
+
         switch (other.tag)
         {
             case "Enemy":
-            case "EnemyBullet":
                 {
                     // 爆炸
+                    Explode();
+                }
+                break;
+            case "EnemyBullet":
+                {
+                    if (ConsumeShield())
+                    {
+                        Destroy(other.gameObject);
+                        return;
+                    }
                     Explode();
                 }
                 break;
@@ -132,6 +155,31 @@ public class PlayerAircraft : BaseAircraft
                 }
                 break;
         }
+    }
+
+    public void AddMoveSpeedUpgrade(float delta)
+    {
+        moveSpeed += Mathf.Abs(delta);
+    }
+
+    public void AddParallelBulletUpgrade()
+    {
+        m_bulletGenerator.AddParallelBullet();
+    }
+
+    public void AddFireRateUpgrade(float delta)
+    {
+        m_bulletGenerator.ReduceFireInterval(delta);
+    }
+
+    public void AddBulletPowerUpgrade()
+    {
+        m_bulletGenerator.AddBulletPower();
+    }
+
+    public void AddShieldUpgrade()
+    {
+        ++m_shieldCount;
     }
 
     /// <summary>
@@ -180,5 +228,42 @@ public class PlayerAircraft : BaseAircraft
     {
         Destroy(m_selfGo);
         m_bulletGenerator.ClearBullets();
+    }
+
+    private bool ConsumeShield()
+    {
+        if (m_shieldCount <= 0) return false;
+        --m_shieldCount;
+        return true;
+    }
+
+    private void CreateShieldFx()
+    {
+        var playerRenderer = GetComponent<SpriteRenderer>();
+        if (playerRenderer == null || playerRenderer.sprite == null) return;
+
+        var fxObj = new GameObject("ShieldFx");
+        m_shieldFxTrans = fxObj.transform;
+        m_shieldFxTrans.SetParent(m_selfTrans, false);
+        m_shieldFxTrans.localPosition = Vector3.zero;
+
+        m_shieldFxRenderer = fxObj.AddComponent<SpriteRenderer>();
+        m_shieldFxRenderer.sprite = playerRenderer.sprite;
+        m_shieldFxRenderer.sortingLayerID = playerRenderer.sortingLayerID;
+        m_shieldFxRenderer.sortingOrder = playerRenderer.sortingOrder + 1;
+        m_shieldFxRenderer.color = new Color(0.3f, 0.9f, 1f, 0.35f);
+        m_shieldFxRenderer.enabled = false;
+    }
+
+    private void UpdateShieldFx()
+    {
+        if (m_shieldFxRenderer == null || m_shieldFxTrans == null) return;
+
+        bool hasShield = m_shieldCount > 0 && !m_isExploding;
+        m_shieldFxRenderer.enabled = hasShield;
+        if (!hasShield) return;
+
+        float pulse = 1f + Mathf.Sin(Time.time * 6f) * 0.08f;
+        m_shieldFxTrans.localScale = new Vector3(pulse, pulse, 1f);
     }
 }

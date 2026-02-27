@@ -140,6 +140,8 @@ public class EnemyAircraft : BaseAircraft
 
         ani.SetBool("explode", true);
 
+        GameMgr.instance.TryDropExperienceOrb(m_selfTrans.position, isBoss);
+
         // 加分
         GameMgr.instance.Score += (int)aircraftType * 1000;
     }
